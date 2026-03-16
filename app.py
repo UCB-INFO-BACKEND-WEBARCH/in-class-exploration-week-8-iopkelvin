@@ -11,8 +11,13 @@ from flask import Flask, jsonify, request
 import time
 import uuid
 from datetime import datetime
+from redis import Redis
+from tasks import send_notification
+from rq.job import Job
+
 
 app = Flask(__name__)
+redis_conn = Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
 
 # In-memory store for notifications
 notifications = {}
@@ -67,6 +72,8 @@ def create_notification():
 
     if not data or 'email' not in data:
         return jsonify({"error": "Email is required"}), 400
+    
+    job = send_notification_sync.delay(id, email, message)
 
     # Create notification record
     notification_id = str(uuid.uuid4())
@@ -88,6 +95,13 @@ def create_notification():
 
     return jsonify(notification), 201
 
+#Task 3
+@app.route('/jobs/<job_id>', methods=['GET'])
+def job_status(job_id, connection_conn):
+    job = Job.fetch(job_id, connection_conn)
+    status = job.get_status()
+    return job.result
+
 
 @app.route('/notifications', methods=['GET'])
 def list_notifications():
@@ -107,4 +121,4 @@ def get_notification(notification_id):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)
